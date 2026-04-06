@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: url-shortener-config
+  namespace: url-shortener
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: urlshortener
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  SERVER_PORT: "8080"
+  RATE_LIMIT_RPM: "100"
+  RATE_LIMIT_WINDOW: "60"
