@@ -41,7 +41,7 @@ class Base62EncoderTest {
     }
 
     @Test
-    void encode_id62_returnsLowercaseA() {
+    void encode_id62_returnsExpectedValue() {
         assertThat(encoder.encode(62L)).isEqualTo("10");
     }
 
