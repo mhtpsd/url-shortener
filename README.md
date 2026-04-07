@@ -4,6 +4,11 @@
 [![Java](https://img.shields.io/badge/Java-17-blue.svg)](https://openjdk.java.net/projects/jdk/17/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Kafka](https://img.shields.io/badge/Kafka-3.6-231F20?style=flat-square&logo=apachekafka&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=flat-square&logo=postgresql&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 A **production-grade URL shortener** built with Spring Boot, Redis cache-aside architecture, and an asynchronous Kafka-driven analytics pipeline — designed for high throughput and horizontal scalability.
 
@@ -11,11 +16,41 @@ A **production-grade URL shortener** built with Spring Boot, Redis cache-aside a
 
 ## 🏗️ Architecture
 
-```
-Client → Nginx/LB → Spring Boot API
-                          ├── PostgreSQL  (persistent storage + Flyway migrations)
-                          ├── Redis       (cache-aside: URL resolution, rate limiting)
-                          └── Kafka       (async click-event analytics pipeline)
+```mermaid
+flowchart TD
+    Client([🌐 Client])
+
+    subgraph LB["Load Balancer"]
+        Nginx[Nginx / LB]
+    end
+
+    subgraph API["Spring Boot API"]
+        App[URL Shortener Service]
+    end
+
+    subgraph CacheLayer["Cache — Redis 7"]
+        Redis[(Redis)]
+    end
+
+    subgraph DBLayer["Storage — PostgreSQL 16 + Flyway"]
+        Postgres[(PostgreSQL)]
+    end
+
+    subgraph Pipeline["Async Analytics Pipeline"]
+        KafkaTopic[[Kafka Topic\nclick-events]]
+        Consumer[Analytics Consumer]
+    end
+
+    Client -->|"① GET /{code}"| Nginx
+    Nginx --> App
+    App -->|"② cache lookup"| Redis
+    Redis -->|"cache hit → 302"| Client
+    Redis -->|"cache miss"| Postgres
+    Postgres -->|"URL data + cache fill"| App
+    App -->|"③ 302 redirect"| Client
+    App -->|"④ publish click event"| KafkaTopic
+    KafkaTopic -->|consume| Consumer
+    Consumer -->|update click stats| Postgres
 ```
 
 **Key design decisions:**
@@ -23,6 +58,31 @@ Client → Nginx/LB → Spring Boot API
 - **Async analytics**: Click events are published to Kafka and consumed by an analytics worker — keeping redirects fast (sub-10 ms P99).
 - **Atomic counters**: `UPDATE … SET click_count = click_count + 1` avoids lost updates under concurrent traffic.
 - **Base62 encoding**: Auto-generated short codes are Base62 of the auto-incremented DB ID (e.g., ID 1 → `"1"`, ID 1 billion → `"15FTGg"`).
+
+---
+
+## ✨ Features
+
+- ⚡ **Sub-10ms P99 redirects** — Redis cache-aside keeps hot URLs in memory
+- 📊 **Async analytics** — Kafka decouples click tracking from redirect latency
+- 🔗 **Custom aliases** — users can choose vanity short codes
+- 📱 **QR code generation** — instant QR codes for any shortened URL
+- 🛡️ **Rate limiting** — per-IP request throttling via Redis
+- 🗄️ **Zero-downtime migrations** — Flyway manages schema evolution
+- ☸️ **Kubernetes-ready** — Kustomize overlays for dev/prod, HPA autoscaling
+- 🧪 **Testcontainers** — integration tests with real PostgreSQL, Redis, Kafka
+
+---
+
+## 📡 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/urls` | Create shortened URL (with optional custom alias) |
+| `GET` | `/api/v1/urls/{code}` | Get URL metadata & stats |
+| `GET` | `/{code}` | Redirect to original URL (302) |
+| `GET` | `/api/v1/urls/{code}/qr` | Generate QR code for short URL |
+| `GET` | `/api/v1/urls/{code}/stats` | Get click analytics |
 
 ---
 
@@ -242,18 +302,19 @@ Spring Actuator endpoints (exposed in production: health, metrics, prometheus):
 
 ```
 src/main/java/com/mohitprasad/urlshortener/
-├── UrlShortenerApplication.java
-├── config/          # Redis, Kafka, OpenAPI, RateLimit configs
-├── controller/      # UrlController, RedirectController, AnalyticsController
-├── service/         # Business logic (interface + impl pattern)
-├── model/
-│   ├── entity/      # JPA entities: ShortenedUrl, ClickEvent
-│   ├── dto/         # Request/Response DTOs
-│   └── enums/       # UrlStatus enum
+├── config/          # Redis, Kafka, Rate Limiting configuration
+├── controller/      # REST API endpoints
+├── exception/       # Global exception handling
+├── kafka/           # Kafka producer & consumer
+├── model/           # JPA entities & DTOs
 ├── repository/      # Spring Data JPA repositories
-├── kafka/           # ClickEventProducer, ClickEventConsumer
-├── util/            # Base62Encoder, UrlValidator
-└── exception/       # Global exception handler + custom exceptions
+├── service/         # Business logic & caching
+└── util/            # Base62 encoder, QR generator
+
+k8s/
+├── base/            # Deployments, Services, ConfigMaps
+├── overlays/        # Kustomize dev & prod patches
+└── namespace.yaml
 ```
 
 ---
