@@ -41,7 +41,8 @@ class UrlShortenerIntegrationTest {
 
     @Container
     static KafkaContainer kafka = new KafkaContainer(
-            DockerImageName.parse("confluentinc/cp-kafka:7.5.0"));
+            DockerImageName.parse("confluentinc/cp-kafka:7.5.0")
+                    .asCompatibleSubstituteFor("apache/kafka"));
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
