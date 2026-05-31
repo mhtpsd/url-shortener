@@ -57,7 +57,7 @@ public class UrlServiceImpl implements UrlService {
 
         // Auto-generate short code using base62(id)
         ShortenedUrl entity = ShortenedUrl.builder()
-                .shortCode("PLACEHOLDER")
+                .shortCode("TEMP")
                 .originalUrl(request.getUrl())
                 .customAlias(false)
                 .expiresAt(request.getExpiresAt())
